@@ -17,3 +17,25 @@ export interface Article {
   updated_at: string;
   is_pinned: boolean;
 }
+
+export interface AdminArticleListItem {
+  id: number;
+  title: string;
+  updated_at: string;
+  section: {
+    id: number;
+    name: string;
+  };
+}
+
+export interface AdminArticleInput {
+  title: string;
+  content: string;
+  section_id: number;
+}
+
+export interface AdminArticleResponse {
+  id: number;
+  createdAt?: string;
+  updatedAt: string;
+}
