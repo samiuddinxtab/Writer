@@ -1,0 +1,14 @@
+{
+  "name": "writer-urdu-articles",
+  "private": true,
+  "workspaces": ["frontend", "worker"],
+  "scripts": {
+    "dev": "echo 'Dev script placeholder'",
+    "build": "echo 'Build script placeholder'",
+    "lint": "echo 'Lint script placeholder'"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}
