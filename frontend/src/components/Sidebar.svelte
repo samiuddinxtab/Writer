@@ -1,39 +1,26 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
-  import type { Article, Section } from '../data/mockData';
-  import { getPinnedArticles, getArticlesBySection } from '../data/mockData';
-  
+  import { createEventDispatcher } from 'svelte';
+  import type { Section } from '../lib/types';
+
+  type SidebarArticle = {
+    id: number;
+    title: string;
+    slug: string;
+    published_at: string;
+    is_pinned: boolean;
+    excerpt?: string;
+  };
+
   const dispatch = createEventDispatcher();
-  
+
   export let sections: Section[] = [];
-  export let currentArticleId: string | null = null;
+  export let currentArticleId: number | null = null;
   export let isOpen: boolean = false;
-  
-  let pinnedArticles: Article[] = [];
-  let articlesBySection: Record<string, Article[]> = {};
-  
-  onMount(() => {
-    // Load pinned articles and articles by section
-    pinnedArticles = getPinnedArticles();
-    
-    // Group articles by section
-    articlesBySection = {};
-    sections.forEach(section => {
-      articlesBySection[section.id] = getArticlesBySection(section.id);
-    });
-  });
-  
-  // Update when props change
-  $: {
-    pinnedArticles = getPinnedArticles();
-    articlesBySection = {};
-    sections.forEach(section => {
-      articlesBySection[section.id] = getArticlesBySection(section.id);
-    });
-  }
-  
-  function selectArticle(articleId: string) {
-    // Dispatch event to parent component
+
+  export let pinnedArticles: SidebarArticle[] = [];
+  export let articlesBySectionSlug: Record<string, SidebarArticle[]> = {};
+
+  function selectArticle(articleId: number) {
     dispatch('articleSelect', { articleId });
   }
   
@@ -45,7 +32,7 @@
         month: 'long',
         day: 'numeric'
       });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   }
@@ -73,7 +60,6 @@
                 aria-current={article.id === currentArticleId ? 'page' : undefined}
               >
                 <div class="pinned-article-title">{article.title}</div>
-                <div class="pinned-article-excerpt">{article.excerpt}</div>
                 <div class="pinned-article-date">{formatDate(article.published_at)}</div>
               </button>
             </li>
@@ -90,9 +76,9 @@
             <h3 class="section-name">{section.name}</h3>
           </header>
           
-          {#if articlesBySection[section.id] && articlesBySection[section.id].length > 0}
+          {#if articlesBySectionSlug[section.slug] && articlesBySectionSlug[section.slug].length > 0}
             <ul class="section-articles">
-              {#each articlesBySection[section.id] as article}
+              {#each articlesBySectionSlug[section.slug] as article}
                 <li class="section-article-item">
                   <button
                     class="section-article-link"
@@ -101,7 +87,6 @@
                     aria-current={article.id === currentArticleId ? 'page' : undefined}
                   >
                     <div class="section-article-title">{article.title}</div>
-                    <div class="section-article-excerpt">{article.excerpt}</div>
                     <div class="section-article-date">{formatDate(article.published_at)}</div>
                   </button>
                 </li>

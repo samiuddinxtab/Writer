@@ -1,26 +1,12 @@
 <script lang="ts">
   import { renderContent } from '../lib/contentRenderer';
-  import type { Article, Section } from '../data/mockData';
-  import { sections as allSections } from '../data/mockData';
+  import type { Article, Section } from '../lib/types';
   
   export let article: Article;
-  export let sections: Section[] = allSections;
+  export let sections: Section[] = [];
   
   // Find the section for this article
-  $: articleSection = sections.find(section => section.id === article.section_id);
-  
-  function formatDate(dateString: string): string {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('ur-PK', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return dateString;
-    }
-  }
+  $: articleSection = sections.find(section => section.id === article.section_id) ?? article.section;
   
   function formatPublishedDate(dateString: string): string {
     try {
@@ -30,7 +16,7 @@
         month: 'long',
         day: 'numeric'
       });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   }
