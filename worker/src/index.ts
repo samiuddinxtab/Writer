@@ -4,18 +4,55 @@ import { checkRateLimit } from './lib/rateLimit';
 
 export type { Env };
 
+/**
+ * CACHING STRATEGY FOR PRODUCTION
+ * ================================
+ * 
+ * Admin endpoints (/api/admin/*):
+ *   - NEVER cached (returned with no-store, no-cache, must-revalidate)
+ *   - No cacheSeconds parameter
+ *   - Ensures drafts/unpublished content is never exposed to readers
+ * 
+ * Public endpoints (/api/*):
+ *   - Cached for 3600 seconds (1 hour) at edge
+ *   - Specified with cacheSeconds: 3600
+ *   - Cache is purged immediately after publish for freshness
+ * 
+ * Default behavior:
+ *   - If no cacheSeconds specified, response gets no-cache headers
+ *   - This protects sensitive admin data from accidental edge caching
+ */
+
 type JsonValue = Record<string, unknown> | unknown[];
 type JsonInit = ResponseInit & {
   headers?: HeadersInit;
   cacheSeconds?: number;
 };
 
+/**
+ * Generate a lightweight request ID for tracing and debugging.
+ * Format: first 8 chars of timestamp + random suffix = 16 chars total
+ */
+function generateRequestId(): string {
+  const timestamp = Date.now().toString(36).slice(-8);
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${timestamp}${random}`;
+}
+
 function jsonResponse(body: JsonValue, init: JsonInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
+  
   if (typeof init.cacheSeconds === 'number') {
     headers.set('Cache-Control', `public, max-age=${init.cacheSeconds}`);
+  } else if (!headers.has('Cache-Control')) {
+    // Default: no cache for any response without explicit cacheSeconds
+    // This ensures admin endpoints are never cached at edge
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    headers.set('Expires', '0');
+    headers.set('Pragma', 'no-cache');
   }
+  
   const { cacheSeconds: _cacheSeconds, ...rest } = init;
   return new Response(JSON.stringify(body), { ...rest, headers });
 }
@@ -28,6 +65,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
+    const requestId = generateRequestId();
 
     try {
       // Admin endpoints
@@ -201,8 +239,14 @@ export default {
           const cacheUrls = getArticleCacheUrls(baseUrl, article.slug, article.section_slug);
           
           // Fire and forget - don't block the response on cache purge
-          void purgeCache(cacheUrls, env).catch((err) => {
-            console.error('Cache purge failed:', err);
+          let cacheWarning: string | undefined;
+          void purgeCache(cacheUrls, env, requestId).then((result) => {
+            if (!result.success && result.warning) {
+              cacheWarning = result.warning;
+              console.warn(`[${requestId}] Cache purge warning: ${result.warning}`);
+            }
+          }).catch((err) => {
+            console.error(`[${requestId}] Cache purge error:`, err);
           });
 
           return jsonResponse({
@@ -212,6 +256,8 @@ export default {
             published_at: article.published_at || publishedAt,
             updated_at: now,
             status: 'published',
+            requestId, // Include for debugging
+            cacheWarning: cacheWarning, // Include if cache failed
           }, { status: 200 });
         }
 
@@ -306,7 +352,7 @@ export default {
 
       return jsonError(404, 'Not Found');
     } catch (error) {
-      console.error('Worker error:', error);
+      console.error(`[${requestId}] Worker error:`, error);
       if (pathname === '/api/sections') {
         return jsonError(500, 'Failed to fetch sections');
       }

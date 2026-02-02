@@ -3,12 +3,20 @@ import type { Env } from './auth';
 export interface PurgeCacheResult {
   success: boolean;
   error?: string;
+  warning?: string; // Indicates publish succeeded but cache may be stale
 }
 
-export async function purgeCache(urls: string[], env: Env): Promise<PurgeCacheResult> {
+export async function purgeCache(urls: string[], env: Env, requestId?: string): Promise<PurgeCacheResult> {
+  const prefix = requestId ? `[${requestId}]` : '';
+
   if (!env.CF_ZONE_ID || !env.CF_API_TOKEN) {
-    console.log('Cache purge skipped: CF_ZONE_ID or CF_API_TOKEN not configured');
-    return { success: false, error: 'Cache purge not configured' };
+    const msg = 'Cache purge not configured (CF_ZONE_ID or CF_API_TOKEN missing)';
+    console.warn(`${prefix} ${msg}`);
+    return {
+      success: false,
+      error: msg,
+      warning: 'Cache may be stale for up to 1 hour. Consider setting CF_API_TOKEN and CF_ZONE_ID.',
+    };
   }
 
   try {
@@ -26,15 +34,26 @@ export async function purgeCache(urls: string[], env: Env): Promise<PurgeCacheRe
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Cache purge failed:', errorData);
-      return { success: false, error: 'Cache purge API call failed' };
+      const msg = `Cache purge API failed: ${response.status}`;
+      console.error(`${prefix} ${msg}`, errorData);
+      return {
+        success: false,
+        error: msg,
+        warning: 'Article published, but cache purge failed. Cache may be stale for up to 1 hour.',
+      };
     }
 
-    console.log('Cache cleared for:', urls);
+    const data = await response.json() as Record<string, unknown>;
+    console.log(`${prefix} Cache purge successful for ${urls.length} URL(s):`, urls, data);
     return { success: true };
   } catch (error) {
-    console.error('Cache purge error:', error);
-    return { success: false, error: String(error) };
+    const msg = `Cache purge error: ${String(error)}`;
+    console.error(`${prefix} ${msg}`);
+    return {
+      success: false,
+      error: msg,
+      warning: 'Article published, but cache purge failed. Cache may be stale for up to 1 hour.',
+    };
   }
 }
 
