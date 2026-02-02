@@ -4,6 +4,25 @@ import { checkRateLimit } from './lib/rateLimit';
 
 export type { Env };
 
+/**
+ * CACHING STRATEGY FOR PRODUCTION
+ * ================================
+ * 
+ * Admin endpoints (/api/admin/*):
+ *   - NEVER cached (returned with no-store, no-cache, must-revalidate)
+ *   - No cacheSeconds parameter
+ *   - Ensures drafts/unpublished content is never exposed to readers
+ * 
+ * Public endpoints (/api/*):
+ *   - Cached for 3600 seconds (1 hour) at edge
+ *   - Specified with cacheSeconds: 3600
+ *   - Cache is purged immediately after publish for freshness
+ * 
+ * Default behavior:
+ *   - If no cacheSeconds specified, response gets no-cache headers
+ *   - This protects sensitive admin data from accidental edge caching
+ */
+
 type JsonValue = Record<string, unknown> | unknown[];
 type JsonInit = ResponseInit & {
   headers?: HeadersInit;
@@ -23,9 +42,17 @@ function generateRequestId(): string {
 function jsonResponse(body: JsonValue, init: JsonInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
+  
   if (typeof init.cacheSeconds === 'number') {
     headers.set('Cache-Control', `public, max-age=${init.cacheSeconds}`);
+  } else if (!headers.has('Cache-Control')) {
+    // Default: no cache for any response without explicit cacheSeconds
+    // This ensures admin endpoints are never cached at edge
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    headers.set('Expires', '0');
+    headers.set('Pragma', 'no-cache');
   }
+  
   const { cacheSeconds: _cacheSeconds, ...rest } = init;
   return new Response(JSON.stringify(body), { ...rest, headers });
 }
