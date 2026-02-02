@@ -5,9 +5,27 @@ interface RateLimitEntry {
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
+// Rate limiting configuration
+// These limits are RELAXED for mobile maintainer (phone can disconnect/reconnect = new IP)
+// Production: Consider implementing via Cloudflare Rate Limiting dashboard rules instead
 const WINDOW_MS = 60 * 1000; // 60 seconds
-const WRITE_LIMIT = 10; // 10 POST/PUT requests per minute
-const READ_LIMIT = 100; // 100 GET requests per minute
+const ADMIN_WRITE_LIMIT = 30; // 30 POST/PUT/DELETE per minute (admin publishing flow)
+const ADMIN_READ_LIMIT = 100; // 100 GET requests per minute (listing articles)
+const PUBLIC_READ_LIMIT = 200; // 200 GET requests per minute (public API)
+
+/**
+ * IMPORTANT: This in-memory rate limiter has limitations:
+ * 1. Resets on Worker restart (may allow bursts after deploy)
+ * 2. Cannot distinguish between mobile admin and bot (both same IP behind VPN/mobile)
+ * 3. Free tier doesn't scale across edge locations
+ *
+ * Preferred approach (production):
+ * Use Cloudflare Dashboard → Security → Rate Limiting
+ * - Rule 1: /api/admin/* → 10 requests/min per IP (blocks bots, allows admin)
+ * - Rule 2: /api/* → 100 requests/min per IP (public API protection)
+ *
+ * For now, in-memory limiter is kept RELAXED to prevent admin lockout.
+ */
 
 function cleanupOldEntries(): void {
   const now = Date.now();
@@ -25,7 +43,13 @@ export function checkRateLimit(request: Request, endpoint: string): boolean {
   
   const method = request.method.toUpperCase();
   const isWrite = method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH';
-  const limit = isWrite ? WRITE_LIMIT : READ_LIMIT;
+  
+  let limit: number;
+  if (endpoint === 'admin') {
+    limit = isWrite ? ADMIN_WRITE_LIMIT : ADMIN_READ_LIMIT;
+  } else {
+    limit = PUBLIC_READ_LIMIT;
+  }
   
   const key = `${clientIp}:${endpoint}:${isWrite ? 'write' : 'read'}`;
   const now = Date.now();
@@ -58,7 +82,13 @@ export function getRateLimitInfo(request: Request, endpoint: string): { remainin
   
   const method = request.method.toUpperCase();
   const isWrite = method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH';
-  const limit = isWrite ? WRITE_LIMIT : READ_LIMIT;
+  
+  let limit: number;
+  if (endpoint === 'admin') {
+    limit = isWrite ? ADMIN_WRITE_LIMIT : ADMIN_READ_LIMIT;
+  } else {
+    limit = PUBLIC_READ_LIMIT;
+  }
   
   const key = `${clientIp}:${endpoint}:${isWrite ? 'write' : 'read'}`;
   const now = Date.now();
