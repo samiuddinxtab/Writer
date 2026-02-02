@@ -180,7 +180,7 @@
   }
   
   .article-content :global(blockquote::before) {
-    content: """;
+    content: "";
     font-size: 3rem;
     color: var(--color-primary);
     position: absolute;
