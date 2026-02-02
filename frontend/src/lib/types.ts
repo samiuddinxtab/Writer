@@ -21,7 +21,9 @@ export interface Article {
 export interface AdminArticleListItem {
   id: number;
   title: string;
+  slug: string;
   updated_at: string;
+  published_at: string | null;
   section: {
     id: number;
     name: string;
