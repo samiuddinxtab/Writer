@@ -1,6 +1,8 @@
 import type { Article, Section, AdminArticleListItem, AdminArticleInput, AdminArticleResponse } from './types';
 import { authStore } from '../stores/authStore';
 
+const API_BASE = 'https://writer.samiuddinxtab.workers.dev';
+
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T;
   return data;
