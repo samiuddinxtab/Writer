@@ -2,14 +2,18 @@
   import { onMount } from 'svelte';
   import { fetchAdminArticles } from '../lib/api';
   import type { AdminArticleListItem } from '../lib/types';
+
   export let onEditArticle: (articleId: number) => void = () => {};
   export let onNewArticle: () => void = () => {};
+
   let articles: AdminArticleListItem[] = [];
   let loading = true;
   let error: string | null = null;
+
   onMount(() => {
     void loadArticles();
   });
+
   async function loadArticles() {
     loading = true;
     error = null;
@@ -21,6 +25,7 @@
       loading = false;
     }
   }
+
   function formatDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -28,6 +33,10 @@
       month: 'short',
       day: 'numeric'
     });
+  }
+
+  function isPublished(article: AdminArticleListItem): boolean {
+    return article.published_at !== null;
   }
 </script>
 
@@ -58,6 +67,7 @@
       <div class="table-header">
         <span class="col-title">Title</span>
         <span class="col-section">Section</span>
+        <span class="col-status">Status</span>
         <span class="col-date">Updated</span>
         <span class="col-action">Action</span>
       </div>
@@ -68,6 +78,13 @@
               {article.title || '(Untitled)'}
             </span>
             <span class="col-section">{article.section.name}</span>
+            <span class="col-status">
+              {#if isPublished(article)}
+                <span class="status-badge status-published">Published</span>
+              {:else}
+                <span class="status-badge status-draft">Draft</span>
+              {/if}
+            </span>
             <span class="col-date">{formatDate(article.updated_at)}</span>
             <span class="col-action">
               <button class="edit-button" on:click|stopPropagation={() => onEditArticle(article.id)}>
@@ -150,7 +167,7 @@
   }
   .table-header {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 80px;
+    grid-template-columns: 2fr 1fr 100px 1fr 80px;
     gap: 1rem;
     padding: 0.75rem 1rem;
     background: var(--color-bg-secondary);
@@ -163,7 +180,7 @@
   }
   .table-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 80px;
+    grid-template-columns: 2fr 1fr 100px 1fr 80px;
     gap: 1rem;
     padding: 0.875rem 1rem;
     border-bottom: 1px solid var(--color-border);
@@ -187,6 +204,25 @@
   .col-section {
     color: var(--color-text-secondary);
     font-size: 0.9rem;
+  }
+  .col-status {
+    display: flex;
+    align-items: center;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .status-published {
+    background: #c6f6d5;
+    color: #22543d;
+  }
+  .status-draft {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-muted);
   }
   .col-date {
     color: var(--color-text-muted);
@@ -229,21 +265,29 @@
       padding: 1rem;
     }
     .col-title {
-      grid-column: 1 / -1;
+      grid-column: 1;
       font-size: 1rem;
       white-space: normal;
-      margin-bottom: 0.25rem;
+    }
+    .col-status {
+      grid-column: 2;
+      grid-row: 1;
     }
     .col-section {
+      grid-column: 1;
+      grid-row: 2;
       font-size: 0.85rem;
     }
     .col-date {
+      grid-column: 1;
+      grid-row: 3;
       font-size: 0.8rem;
-      text-align: right;
     }
     .col-action {
       grid-column: 2;
-      grid-row: 2;
+      grid-row: 2 / 4;
+      display: flex;
+      align-items: center;
     }
   }
 </style>
